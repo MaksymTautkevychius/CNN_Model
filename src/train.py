@@ -9,7 +9,7 @@ train_losses = []
 test_losses = []
 test_accuracies = []
 
-def train_and_save(model_0, train_dataloader, test_dataloader, epochs, loss_fn, optimizer, device="cuda") -> nn.Module:
+def train_and_save(model_0, train_dataloader, test_dataloader, epochs, loss_fn, optimizer, device="cpu") -> nn.Module:
     model_0.to(device)  
 
     for epoch in range(epochs):  
