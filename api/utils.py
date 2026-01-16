@@ -31,14 +31,13 @@ def csv_to_dataloader(file, batch_size=32, has_target=True):
         y = df["target"].values
         y = torch.tensor(y, dtype=torch.long)
     else:
-        # Auto-drop label column if present
         if "label" in df.columns:
             df = df.drop(columns=["label"])
             X = df.values
         y = None
 
     X = torch.tensor(X, dtype=torch.float32)
-    X = X.view(-1, 1, 28, 28)  # MNIST reshape
+    X = X.view(-1, 1, 28, 28)  
 
     dataset = TensorDataset(X, y) if has_target else TensorDataset(X)
     return DataLoader(dataset, batch_size=batch_size, shuffle=has_target)
