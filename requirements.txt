@@ -1,9 +1,8 @@
-# Core dependencies
 torch>=2.0.0
 torchvision>=0.15.0
 torchaudio>=2.0.0
 matplotlib>=3.8.0
 
-# Development and testing tools
+
 flake8>=6.0.0
 pytest>=7.4.0

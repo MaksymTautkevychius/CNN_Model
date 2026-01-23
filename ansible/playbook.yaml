@@ -1,0 +1,183 @@
+---
+- name: Deploy CNN Model FastAPI Application Locally with Docker
+  hosts: production
+  become: yes
+
+  tasks:
+    - name: Install Docker and pip
+      apt:
+        name:
+          - docker.io
+          - python3-pip
+        state: present
+        update_cache: yes
+
+    - name: Install Docker Python module
+      pip:
+        name: docker
+        break_system_packages: yes
+
+    - name: Start Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Create project directory
+      file:
+        path: "{{ remote_project_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Sync project files to deployment directory (excluding unnecessary files)
+      synchronize:
+        src: "{{ local_project_dir }}/"
+        dest: "{{ remote_project_dir }}/"
+        delete: yes
+        recursive: yes
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=__pycache__"
+          - "--exclude=*.pyc"
+          - "--exclude=.pytest_cache"
+          - "--exclude=venv"
+          - "--exclude=.venv"
+          - "--exclude=data/*"
+          - "--exclude=models/*"
+          - "--exclude=*.egg-info"
+          - "--exclude=.ipynb_checkpoints"
+          - "--exclude=*.ipynb"
+          - "--exclude=.DS_Store"
+
+    - name: Create Dockerfile for building image
+      copy:
+        dest: "{{ remote_project_dir }}/Dockerfile"
+        mode: "0644"
+        content: |
+          FROM python:3.12-slim
+
+          WORKDIR /app
+
+          RUN apt-get update && apt-get install -y --no-install-recommends \
+              gcc g++ \
+            && rm -rf /var/lib/apt/lists/*
+
+          COPY requirements.txt .
+          RUN pip install --no-cache-dir -r requirements.txt
+
+          RUN pip install --no-cache-dir \
+              fastapi>=0.104.0 \
+              uvicorn[standard]>=0.24.0 \
+              python-multipart>=0.0.6 \
+              pandas>=2.0.0 \
+              tqdm>=4.66.0
+
+          COPY . .
+          RUN mkdir -p models data
+
+          EXPOSE {{ api_port }}
+
+          ENV PYTHONUNBUFFERED=1
+          ENV PYTHONPATH=/app
+
+          CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "{{ api_port }}"]
+
+    - name: Remove old image (ignore if missing)
+      community.docker.docker_image:
+        name: "{{ docker_image_name }}"
+        tag: "{{ docker_image_tag }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Build Docker image from Dockerfile
+      community.docker.docker_image:
+        name: "{{ docker_image_name }}"
+        tag: "{{ docker_image_tag }}"
+        source: build
+        build:
+          path: "{{ remote_project_dir }}"
+          pull: yes
+          nocache: true
+        force_source: true
+        state: present
+      register: image_build_result
+
+    - name: Display image build result
+      debug:
+        msg: "Docker image {{ docker_image_name }}:{{ docker_image_tag }} built successfully"
+      when: image_build_result is succeeded
+
+    - name: Verify image CMD is uvicorn
+      command: >
+        docker image inspect {{ docker_image_name }}:{{ docker_image_tag }}
+        --format '{{"{{"}}json .Config.Cmd{{"}}"}}'
+      register: image_cmd
+
+    - name: Show image CMD
+      debug:
+        var: image_cmd.stdout
+
+    - name: Create configuration directory
+      file:
+        path: "{{ remote_project_dir }}/config"
+        state: directory
+        mode: "0755"
+
+    - name: Create application configuration file
+      copy:
+        dest: "{{ remote_project_dir }}/config/app.conf"
+        mode: "0644"
+        content: |
+          # CNN Model API Configuration
+          API_PORT={{ api_port }}
+          HOST_PORT={{ host_port }}
+          MODEL_DIR={{ app_config.MODEL_DIR }}
+          DATA_DIR={{ app_config.DATA_DIR }}
+          PYTHONUNBUFFERED={{ app_config.PYTHONUNBUFFERED }}
+
+    - name: Stop and remove old container if exists
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Start Docker container with CNN Model API
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        image: "{{ docker_image_name }}:{{ docker_image_tag }}"
+        state: started
+        recreate: true
+        restart_policy: unless-stopped
+        ports:
+          - "{{ host_port }}:{{ api_port }}"
+        volumes:
+          - "{{ remote_project_dir }}/models:/app/models"
+          - "{{ remote_project_dir }}/data:/app/data"
+        env: "{{ app_config }}"
+
+    - name: Wait for container to be running
+      command: docker inspect --format='{{"{{"}}.State.Running{{"}}"}}' {{ container_name }}
+      register: container_state
+      until: container_state.stdout == 'true'
+      retries: 10
+      delay: 2
+
+    - name: Display deployment summary
+      debug:
+        msg: |
+          CNN Model FastAPI Deployment
+          Built Image: {{ docker_image_name }}:{{ docker_image_tag }}
+          Container: {{ container_name }}
+          API URL: http://localhost:{{ host_port }}
+          API Docs: http://localhost:{{ host_port }}/docs
+
+          Available Endpoints:
+          - GET  /models          - List all models
+          - POST /predict         - Make predictions
+          - POST /continue-train  - Continue training
+
+          Management Commands:
+          - View logs: docker logs {{ container_name }}
+          - Check status: docker ps
+          - Restart: docker restart {{ container_name }}
+          - Stop: docker stop {{ container_name }}

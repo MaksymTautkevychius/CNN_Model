@@ -1,4 +1,3 @@
-#this is a dockerfile for console application
 FROM python:3.12-slim
 
 
@@ -37,4 +36,4 @@ EXPOSE 8000
 ENV PYTHONUNBUFFERED=1
 ENV TORCH_HOME=/app/.torch
 
-CMD ["python", "main.py"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,22 @@
+---
+production:
+  hosts:
+    localhost:
+      ansible_connection: local
+      
+  vars:
+    local_project_dir: "{{ playbook_dir }}/.."
+    remote_project_dir: /opt/cnn_model
+    
+    docker_image_name: cnn-model-api
+    docker_image_tag: latest
+    
+    container_name: cnn-api-container
+    
+    api_port: 5000
+    host_port: 5000
+    
+    app_config:
+      PYTHONUNBUFFERED: "1"
+      MODEL_DIR: "/app/models"
+      DATA_DIR: "/app/data"

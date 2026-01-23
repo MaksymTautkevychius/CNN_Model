@@ -1,4 +1,4 @@
-# Python
+
 __pycache__
 *.py[cod]
 *$py.class
@@ -8,46 +8,45 @@ __pycache__
 dist/
 build/
 
-# Virtual environments
+
 .venv
 venv/
 ENV/
 
-# IDE
+
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Git
+
 .git
 .gitignore
 .github
 
-# Data and models (don't copy local data/models to image)
+
 data/
 models/*.pth
 *.pth
 
-# Cache
+
 .pytest_cache/
 .mypy_cache/
 .tox/
 
-# Jupyter
+
 *.ipynb
 .ipynb_checkpoints
 
-# Docker
 .dockerignore
 Dockerfile
 docker-compose.yml
 
-# Documentation
+
 README.md
 *.md
 
-# Misc
+
 .DS_Store
 .env
 *.log
